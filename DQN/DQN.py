@@ -21,7 +21,6 @@ lam = 1e-3
 env = gym.make("CartPole-v0")
 model_path = "./cartpole.h5"
 load_model = False
-
 class memory:
     def __init__(self, N):
         self.N = N
