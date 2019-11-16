@@ -1,1 +1,3 @@
-# DRL_Practice
+# DRL Baselines
+
+Personal implementations of DRL algorithms.
