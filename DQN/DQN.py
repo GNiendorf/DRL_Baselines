@@ -12,15 +12,16 @@ memory_cap = 100000
 output_freq = 10
 batch_size = 64
 frames_init = 1e4
-total_episodes = 1e5
+total_episodes = 1e6
 gamma = 0.99
 e_max = 1.
 e_min = 0.01
-lam = 1e-3
+exp_frames = 5e3
 
 env = gym.make("CartPole-v0")
 model_path = "./cartpole.h5"
 load_model = False
+
 class memory:
     def __init__(self, N):
         self.N = N
@@ -76,9 +77,7 @@ else:
         keras.layers.Dense(env.action_space.n, activation='linear')
     ])
 
-sgd = keras.optimizers.RMSprop(learning_rate=0.00025)
-model.compile(optimizer=sgd, loss='mean_squared_error', metrics=['acc'])
-
+model.compile(optimizer='Adam', loss='mean_squared_error', metrics=['acc'])
 
 max_avg = 0.
 time_steps= 0.
@@ -91,9 +90,9 @@ for episode in range(int(total_episodes)):
 
     for t in range(10000):
         if load_model == False:
-            epsilon = e_min + (e_max - e_min)*np.exp(-lam*(time_steps-frames_init))
+            epsilon = np.max([(e_min-e_max)/exp_frames*(time_steps - frames_init) + 1, e_min])
         else:
-            epsilon = 0.01
+            epsilon = 0.005
             env.render()
 
         if np.random.randn() < epsilon or len(bank.memory) < frames_init:
@@ -113,7 +112,7 @@ for episode in range(int(total_episodes)):
         sars = [s_, a, r, s]
         bank.add_memory(sars)
         
-        if len(bank.memory) > frames_init:
+        if len(bank.memory) > frames_init and load_model == False:
             sars_tuples = bank.sample_memory(n=batch_size)
             states, targets = gen_samples(model, sars_tuples, gamma)
             model.fit(states, targets, verbose=0)

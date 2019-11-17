@@ -16,7 +16,7 @@ total_episodes = 1e6
 gamma = 0.99
 e_max = 1.
 e_min = 0.1
-lam = 1e-6
+exp_frames = 1e6
 
 env = wrap_deepmind(gym.make('Breakout-v0'), frame_stack=True)
 model_path = "./atari.h5"
@@ -80,9 +80,7 @@ else:
         keras.layers.Dense(env.action_space.n, activation='linear')
     ])
 
-sgd = keras.optimizers.RMSprop(learning_rate=0.00025)
-model.compile(optimizer=sgd, loss='mean_squared_error', metrics=['acc'])
-
+model.compile(optimizer='Adam', loss='mean_squared_error', metrics=['acc'])
 
 max_avg = 0.
 time_steps= 0.
@@ -95,7 +93,7 @@ for episode in range(int(total_episodes)):
 
     for t in range(10000):
         if load_model == False:
-            epsilon = e_min + (e_max - e_min)*np.exp(-lam*(time_steps-frames_init))
+            epsilon = np.max([(e_min-e_max)/exp_frames*(time_steps - frames_init) + 1, e_min])
         else:
             epsilon = 0.05
             env.render()
