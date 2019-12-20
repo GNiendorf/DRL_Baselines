@@ -8,15 +8,16 @@ from tensorflow import keras
 import gym
 from baselines.common.atari_wrappers import wrap_deepmind
 
-memory_cap = 100000
-output_freq = 100
+memory_cap = 250000
+output_freq = 10
 batch_size = 32
-frames_init = 1e4
+frames_init = 5e4
 total_episodes = 1e6
 gamma = 0.99
 e_max = 1.
 e_min = 0.1
 exp_frames = 1e6
+update_freq = 1e4
 
 env = wrap_deepmind(gym.make('Breakout-v0'), frame_stack=True)
 model_path = "./atari.h5"
@@ -39,16 +40,16 @@ class memory:
         indices = np.random.choice(len(self.memory), size=np.min([n, len(self.memory)]))
         return np.array([self.memory[idx] for idx in indices])
 
-def gen_samples(model, sars_tuples, gamma):
-    default = np.zeros(env.observation_space.shape)
-    targets = np.zeros((len(sars_tuples), env.action_space.n))
+def gen_samples(model, target_model, sars_tuples, gamma):
+    default = np.zeros(env.observation_space.shape, dtype=np.float64)
+    targets = np.zeros((len(sars_tuples), env.action_space.n), dtype=np.float64)
     
     terminal = [1 if s is None else 0 for s in sars_tuples[:,-1]]
-    S_b = np.array([s._out for s in sars_tuples[:,0]])
-    Sb = np.array([s._out if s is not None else default for s in sars_tuples[:,-1]])
+    S_b = np.array([s._out for s in sars_tuples[:,0]], dtype=np.float64)
+    Sb = np.array([s._out if s is not None else default for s in sars_tuples[:,-1]], dtype=np.float64)
 
     S_targets = model.predict(S_b)
-    Stargets = model.predict(Sb)
+    Stargets = target_model.predict(Sb)
 
     for idx in range(len(sars_tuples)):
         s_ = S_b[idx]
@@ -69,9 +70,7 @@ def gen_samples(model, sars_tuples, gamma):
     
     return S_b, targets
 
-if load_model:
-    model = keras.models.load_model(model_path)
-else:
+def create_model():
     model = keras.Sequential([
         keras.layers.Conv2D(16, (8,8), strides=4, activation='relu', input_shape=(84, 84, 4)),
         keras.layers.Conv2D(32, (4,4), strides=2, activation='relu'),
@@ -79,13 +78,23 @@ else:
         keras.layers.Dense(256, activation='relu'),
         keras.layers.Dense(env.action_space.n, activation='linear')
     ])
+    return model
 
+if load_model:
+    model = keras.models.load_model(model_path)
+    target_model = keras.models.load_model(model_path)
+else:
+    target_model = create_model()
+    model = create_model()
+
+target_model.compile(optimizer='Adam', loss='mean_squared_error', metrics=['acc'])
 model.compile(optimizer='Adam', loss='mean_squared_error', metrics=['acc'])
 
 max_avg = 0.
 time_steps= 0.
 rewards = []
 bank = memory(N = memory_cap)
+#Q_vals = []
 
 for episode in range(int(total_episodes)):
     s = env.reset()
@@ -101,7 +110,9 @@ for episode in range(int(total_episodes)):
         if np.random.randn() < epsilon or len(bank.memory) < frames_init:
             a = env.action_space.sample()
         else:
-            a = np.argmax(model.predict(np.expand_dims(s, axis=0)))
+            q_vals = model.predict(np.expand_dims(s, axis=0).astype(np.float64))
+ #           Q_vals.append(np.max(q_vals))
+            a = np.argmax(q_vals)
 
         s_ = copy.deepcopy(s)
         s, r, done, info = env.step(a)      
@@ -115,16 +126,22 @@ for episode in range(int(total_episodes)):
         sars = [s_, a, r, s]
         bank.add_memory(sars)
         
-        if len(bank.memory) > frames_init:
+        if len(bank.memory) >= frames_init and load_model == False:
             sars_tuples = bank.sample_memory(n=batch_size)
-            states, targets = gen_samples(model, sars_tuples, gamma)
+            states, targets = gen_samples(model, target_model, sars_tuples, gamma)
             model.fit(states, targets, verbose=0)
+
+        if time_steps % update_freq == 0. and len(bank.memory) >= frames_init and load_model == False:
+            print("updating target model!")
+            target_model.set_weights(model.get_weights())
         
         if done:
             break
 
     rewards.append(R)
     if episode % output_freq == 0 and episode > 0 and load_model == False:
+#        np.savetxt('qvals.txt', Q_vals)
+        np.savetxt('rewards.txt', rewards)
         print("\n")
         print("------------------------------------------")
         print("Current Epsilon: %.2f" % epsilon)
