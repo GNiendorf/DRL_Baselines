@@ -1,6 +1,8 @@
 # DQN
 
-Implemetations of various DQN's.
+Implemetations of various DQN's. See the gif below of an agent that was trained with DQN.py on breakout!
+
+![Alt text](./breakout3.gif?raw=true "Title")
 
 Papers
 
