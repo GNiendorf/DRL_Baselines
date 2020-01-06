@@ -3,8 +3,8 @@
 Personal implementations of DRL algorithms.
 
 Planned Implementations
-  * DQN
+  * ~~DQN~~
+  * VPG
   * A2C
-  * A3C
   * PPO
   * DDPG
