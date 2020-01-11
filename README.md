@@ -7,6 +7,6 @@ Planned Implementations
   * ~~Double DQN~~
   * PER DQN
   * VPG
-  * A2C
+  * TRPO
   * PPO
   * DDPG
