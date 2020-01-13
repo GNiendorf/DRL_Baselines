@@ -8,8 +8,7 @@ from tensorflow import keras
 env = gym.make('CartPole-v0')
 
 class memory:
-    def __init__(self, N):
-        self.N = N
+    def __init__(self):
         self.memory = []
 
     def add_memory(self, sars_tuple):
@@ -36,11 +35,12 @@ class memory:
         self.memory = []
 
 layer = keras.layers.Dense(64, activation=tf.nn.relu)
+layer2 = keras.layers.Dense(64, activation=tf.nn.relu)
 out = keras.layers.Dense(env.action_space.n, activation=tf.nn.softmax)
-model = keras.Sequential([layer, out])
-optimizer = tf.optimizers.Adam(learning_rate = .00025)
+model = keras.Sequential([layer, layer2, out])
+optimizer = tf.optimizers.Adam(learning_rate = .0001)
 
-bank = memory(N=100)
+bank = memory()
 gamma = 0.99
 max_time = 10000
 time = 0
@@ -77,12 +77,13 @@ while time < max_time:
         pis = tf.multiply(batch_probs, acts)
         pis = tf.reduce_sum(pis, axis=1)
         returns = tf.cast(returns, tf.float32)
+        returns = tf.reshape(returns, (returns.shape[0],))
         loss = tf.math.multiply(tf.math.log(pis), tf.stop_gradient(returns))
-        loss_total = tf.reduce_mean(loss)
+        loss = -tf.reduce_mean(loss)
         with writer.as_default():
-            tf.summary.scalar("loss", loss_total, step=time)
+            tf.summary.scalar("loss", loss, step=time)
 
-    gradients = tape.gradient(loss_total, model.trainable_variables)
+    gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     bank.clear_memory()
     time += 1
