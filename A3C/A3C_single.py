@@ -46,6 +46,7 @@ gamma = 0.99
 max_time = 1e6
 time = 0
 beta = .01
+kappa = .5
 
 uniq_id = "./a3c_tb2/"+'{0:%Y-%m-%d--%H:%M:%S}'.format(datetime.datetime.now())
 writer = tf.summary.create_file_writer(uniq_id)
@@ -86,7 +87,9 @@ while time < max_time:
         entropy = -tf.reduce_mean(entropy)
         loss = tf.math.multiply(tf.math.log(pis), tf.stop_gradient(returns_base))
         loss = -tf.reduce_mean(loss)
-        policy_loss = loss + beta*entropy
+        state_loss = tf.square(returns_base)
+        state_loss = tf.reduce_mean(state_loss)
+        policy_loss = loss + beta*entropy - kappa*state_loss
         with writer.as_default():
             tf.summary.scalar("policy loss", policy_loss, step=time)
 
