@@ -3,10 +3,11 @@
 Personal implementations of DRL algorithms.
 
 Planned Implementations
-  * ~~DQN~~
-  * ~~Double DQN~~
+  * DQN
+  * Double DQN
   * PER DQN
-  * ~~VPG~~
+  * Distributional DQN
+  * VPG
   * A3C
   * TRPO
   * PPO
