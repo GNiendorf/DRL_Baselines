@@ -93,19 +93,21 @@ def gen_targets(model, target_model, sars_tuples):
         state_pred_a = state_pred[a]
         next_state_pred_a = next_state_pred[a_star]
 
-        if term:
-            next_state_pred_a = np.zeros(num_atoms)
-            zero_idx = np.abs(z_vals).argmin()
-            next_state_pred_a[zero_idx] = 1.
-
         m = np.zeros(num_atoms)
 
-        for j in range(num_atoms):
-            T_z_j = max(min(r + gamma*z_vals[j], V_max), V_min)
+        if term:
+            T_z_j = max(min(r, V_max), V_min)
             b_j = (T_z_j - V_min)/del_z
-            u = math.ceil(b_j); l = int(b_j)
-            m[l] += (u-b_j)*next_state_pred_a[j]
-            m[u] += (b_j-l)*next_state_pred_a[j]
+            u = math.ceil(b_j); l = math.floor(b_j)
+            m[l] += (u-b_j)
+            m[u] += (b_j-l)
+        else:
+            for j in range(num_atoms):
+                T_z_j = max(min(r + gamma*z_vals[j], V_max), V_min)
+                b_j = (T_z_j - V_min)/del_z
+                u = math.ceil(b_j); l = math.floor(b_j)
+                m[l] += (u-b_j)*next_state_pred_a[j]
+                m[u] += (b_j-l)*next_state_pred_a[j]
 
         state_pred[a] = m
         targets[idx] = state_pred
