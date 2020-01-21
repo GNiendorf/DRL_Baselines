@@ -7,7 +7,7 @@ Current Implementations
   * Double DQN
   * C51
   * VPG
-  * A3C
+  * A3C (Almost)
 
 Planned Implementations
   * Pr DQN
