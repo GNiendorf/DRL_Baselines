@@ -2,13 +2,17 @@
 
 Personal implementations of DRL algorithms.
 
-Planned Implementations
+Current Implementations
   * DQN
   * Double DQN
-  * PER DQN
-  * Distributional DQN
+  * C51
   * VPG
   * A3C
+
+Planned Implementations
+  * Pr DQN
   * TRPO
   * PPO
   * DDPG
+  * Simplified Rainbow
+  * Dueling DQN
