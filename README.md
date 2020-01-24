@@ -7,12 +7,14 @@ Current Implementations
   * Double DQN
   * C51
   * VPG
-  * A3C (Almost)
+  
+In Progress
+  * A3C
+  * PPO
 
 Planned Implementations
   * Pr DQN
-  * TRPO
-  * PPO
-  * DDPG
-  * Simplified Rainbow
   * Dueling DQN
+  * Simplified Rainbow
+  * TRPO
+  * DDPG
