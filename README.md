@@ -9,8 +9,8 @@ Current Implementations
   * VPG
   
 In Progress
-  * A3C
-  * PPO
+  * A3C (Need to parallelize)
+  * PPO (Need to parallelize)
 
 Planned Implementations
   * Pr DQN
