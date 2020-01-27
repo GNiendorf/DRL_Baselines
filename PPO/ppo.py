@@ -4,6 +4,9 @@ import gym
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+from tensorflow.keras.initializers import VarianceScaling
+import tensorflow_probability as tfp
+tfd = tfp.distributions
 
 env = gym.make('CartPole-v0')
 
@@ -49,20 +52,39 @@ optimizer = tf.optimizers.Adam(learning_rate=3e-4)
 
 bank = memory()
 max_time = 1e6
-train_freq = 20
 time = 0
-epochs = 10
+
+train_freq = 100
+t_max = 200
+gamma = .99
+beta = 0.1
+epochs = 3
 epsilon = .2
 true_time = 0
 
 uniq_id = "./ppo_tb2/"+'{0:%Y-%m-%d--%H:%M:%S}'.format(datetime.datetime.now())
 writer = tf.summary.create_file_writer(uniq_id)
 
+def get_returns(sars, gamma, model_val):
+    returns = []
+    for idx, r in enumerate(sars[2]):
+        undiscounted = sars[2][idx+1:]
+        final_state_val = 0
+        done_last = sars[4][-1]
+        final_state = sars[3][-1]
+        if not done_last:
+            final_state_val = model_val.predict(final_state[None])[0][0]
+        undiscounted *= gamma**np.arange(len(undiscounted))
+        returns.append([np.sum(undiscounted) + final_state_val])
+    returns = tf.cast(returns, tf.float32)
+    return returns
+
 while time < max_time: 
     R = 0
     s_ = env.reset()
     done = False
-    while not done:
+    time_start = time
+    while not done and time-time_start < t_max:
         time += 1
         probs = model_act.predict(s_[None])[0]
         a = np.random.choice(len(probs), p=probs)
@@ -73,20 +95,16 @@ while time < max_time:
         sars = [s_, one_hot, r, s, done]
         bank.add_memory(sars)
         s_ = s
-        
-        if (time % train_freq == 0 or done) and len(bank.memory) > 0:
-            sars = bank.recall_memory()
-            returns = []
-            for idx, r in enumerate(sars[2]):
-                returns.append([np.sum(sars[2][idx+1:])])
 
-            returns = tf.cast(returns, tf.float32)
-            returns = tf.reshape(returns, (returns.shape[0],))
+        if ((time-time_start) % train_freq == 0 or done) and len(bank.memory) > 1:
+            sars = bank.recall_memory()
+            returns = get_returns(sars, gamma, model_val)
 
             batch_probs_old = model_act(sars[0].astype(np.float32))
             acts = tf.cast(sars[1], tf.float32)
             pis_old = tf.multiply(batch_probs_old, acts)
-            pis_old = tf.reduce_sum(pis_old, axis=1)
+            pis_old = tf.reduce_sum(pis_old, axis=1, keepdims=True)
+            pis = pis_old
 
             for N in range(epochs):
                 true_time += 1
@@ -95,19 +113,23 @@ while time < max_time:
                     state_vals = model_val(sars[0].astype(np.float32))
                     acts = tf.cast(sars[1], tf.float32)
                     pis = tf.multiply(batch_probs_new, acts)
-                    pis = tf.reduce_sum(pis, axis=1)
-                    ratio = pis / pis_old
+                    pis = tf.reduce_sum(pis, axis=1, keepdims=True)
+                    kl_approx = tf.reduce_mean(tf.square(tf.subtract(pis, pis_old)))
+                    ratio = tf.math.divide(pis, pis_old)
                     ratio_clipped = tf.clip_by_value(ratio, 1-epsilon, 1+epsilon)
                     returns_base = tf.subtract(returns, state_vals)
+                    entropy = tf.math.multiply(tf.math.log(batch_probs_new + 1e-10), batch_probs_new)
+                    entropy = tf.reduce_sum(entropy, axis=1, keepdims=True)
                     loss = tf.math.multiply(ratio, tf.stop_gradient(returns_base))
-                    loss = tf.reduce_mean(loss)
                     loss_clipped = tf.math.multiply(ratio_clipped, tf.stop_gradient(returns_base))
-                    loss_clipped = tf.reduce_mean(loss_clipped)
-                    true_loss = -tf.math.minimum(loss, loss_clipped)
+                    true_loss = tf.math.minimum(loss, loss_clipped)
+                    total_loss = true_loss + beta*entropy
+                    total_loss = -tf.reduce_mean(total_loss)
                     with writer.as_default():
-                        tf.summary.scalar("policy loss", true_loss, step=true_time)
+                        tf.summary.scalar("policy loss", total_loss, step=true_time)
+                        tf.summary.scalar("approximate KL", kl_approx, step=true_time)
 
-                gradients_act = tape.gradient(true_loss, model_act.trainable_variables)
+                gradients_act = tape.gradient(total_loss, model_act.trainable_variables)
                 optimizer.apply_gradients(zip(gradients_act, model_act.trainable_variables))
 
             with tf.GradientTape() as tape:
